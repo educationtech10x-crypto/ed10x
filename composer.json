@@ -1,6 +1,6 @@
 {
   "name": "educationtech10x/ed10x",
-  "description": "ED10X marketing site — static export in www/ for Hostinger Git deploy",
+  "description": "ED10X marketing site — static export in out/ for Hostinger Git deploy",
   "type": "project",
   "license": "proprietary",
   "require": {
