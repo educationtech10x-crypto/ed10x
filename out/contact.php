@@ -104,18 +104,7 @@ $fromName = (string) $cfg["contact_from_name"];
 $to = (string) $cfg["contact_to"];
 
 try {
-    smtp_send_ssl(
-        (string) $cfg["smtp_host"],
-        (int) $cfg["smtp_port"],
-        (string) $cfg["smtp_user"],
-        (string) $cfg["smtp_pass"],
-        $fromEmail,
-        $fromName,
-        $to,
-        $email,
-        $subject,
-        $text
-    );
+    smtp_send_mail($cfg, $fromEmail, $fromName, $to, $email, $subject, $text);
 } catch (Throwable $e) {
     error_log("[ED10X contact.php] " . $e->getMessage());
     http_response_code(500);
@@ -126,13 +115,12 @@ try {
 echo json_encode(["ok" => true]);
 
 /**
+ * @param array<string, mixed> $cfg
+ *
  * @throws RuntimeException
  */
-function smtp_send_ssl(
-    string $host,
-    int $port,
-    string $user,
-    string $pass,
+function smtp_send_mail(
+    array $cfg,
     string $fromEmail,
     string $fromName,
     string $to,
@@ -140,32 +128,62 @@ function smtp_send_ssl(
     string $subject,
     string $body
 ): void {
+    $host = (string) $cfg["smtp_host"];
+    $port = (int) $cfg["smtp_port"];
+    $user = (string) $cfg["smtp_user"];
+    $pass = (string) $cfg["smtp_pass"];
+
+    $verifyPeer = empty($cfg["smtp_tls_insecure"]);
     $ctx = stream_context_create([
         "ssl" => [
-            "verify_peer" => true,
-            "verify_peer_name" => true,
-            "allow_self_signed" => false,
+            "verify_peer" => $verifyPeer,
+            "verify_peer_name" => $verifyPeer,
+            "allow_self_signed" => !$verifyPeer,
         ],
     ]);
 
-    $fp = @stream_socket_client(
-        "ssl://{$host}:{$port}",
-        $errno,
-        $errstr,
-        30,
-        STREAM_CLIENT_CONNECT,
-        $ctx
-    );
+    $ehloHost = smtp_ehlo_hostname($fromEmail);
+    $useStartTls = $port === 587 || (!empty($cfg["smtp_encryption"]) && strtolower((string) $cfg["smtp_encryption"]) === "starttls");
 
-    if (!$fp) {
-        throw new RuntimeException("SMTP connect failed: {$errstr} ({$errno})");
+    if ($useStartTls && $port !== 465) {
+        $fp = @stream_socket_client(
+            "tcp://{$host}:{$port}",
+            $errno,
+            $errstr,
+            45,
+            STREAM_CLIENT_CONNECT,
+            $ctx
+        );
+        if (!$fp) {
+            throw new RuntimeException("SMTP TCP connect failed: {$errstr} ({$errno})");
+        }
+        stream_set_timeout($fp, 45);
+        smtp_expect($fp, [220]);
+        smtp_cmd($fp, "EHLO {$ehloHost}", [250]);
+        smtp_cmd($fp, "STARTTLS", [220]);
+        $cryptoOk = @stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+        if (!$cryptoOk) {
+            fclose($fp);
+            throw new RuntimeException("STARTTLS negotiation failed");
+        }
+        smtp_cmd($fp, "EHLO {$ehloHost}", [250]);
+    } else {
+        $fp = @stream_socket_client(
+            "ssl://{$host}:{$port}",
+            $errno,
+            $errstr,
+            45,
+            STREAM_CLIENT_CONNECT,
+            $ctx
+        );
+        if (!$fp) {
+            throw new RuntimeException("SMTP SSL connect failed: {$errstr} ({$errno})");
+        }
+        stream_set_timeout($fp, 45);
+        smtp_expect($fp, [220]);
+        smtp_cmd($fp, "EHLO {$ehloHost}", [250]);
     }
 
-    stream_set_timeout($fp, 30);
-
-    smtp_expect($fp, [220]);
-    $ehlo = $_SERVER["HTTP_HOST"] ?? "localhost";
-    smtp_cmd($fp, "EHLO {$ehlo}", [250]);
     smtp_cmd($fp, "AUTH LOGIN", [334]);
     smtp_cmd($fp, base64_encode($user), [334]);
     smtp_cmd($fp, base64_encode($pass), [235]);
@@ -174,8 +192,8 @@ function smtp_send_ssl(
     smtp_cmd($fp, "RCPT TO:<{$to}>", [250, 251]);
     smtp_cmd($fp, "DATA", [354]);
 
-    $encodedSubject = mb_encode_mimeheader($subject, "UTF-8", true);
-    $fromHeader = mb_encode_mimeheader($fromName, "UTF-8", true) . " <{$fromEmail}>";
+    $encodedSubject = smtp_mime_header_encode($subject);
+    $fromHeader = smtp_mime_header_encode($fromName) . " <{$fromEmail}>";
 
     $headers = [
         "From: {$fromHeader}",
@@ -187,11 +205,45 @@ function smtp_send_ssl(
         "Subject: {$encodedSubject}",
     ];
 
-    $payload = implode("\r\n", $headers) . "\r\n\r\n" . str_replace("\n", "\r\n", $body) . "\r\n.";
+    $bodyNorm = str_replace("\r\n", "\n", $body);
+    $bodyNorm = str_replace("\r", "\n", $bodyNorm);
+    $bodyStuffed = smtp_dot_stuff($bodyNorm);
+
+    $payload = implode("\r\n", $headers) . "\r\n\r\n" . str_replace("\n", "\r\n", $bodyStuffed) . "\r\n.";
     fwrite($fp, $payload . "\r\n");
     smtp_expect($fp, [250]);
     smtp_cmd($fp, "QUIT", [221]);
     fclose($fp);
+}
+
+function smtp_ehlo_hostname(string $fromEmail): string {
+    $at = strpos($fromEmail, "@");
+    if ($at !== false && $at < strlen($fromEmail) - 1) {
+        return substr($fromEmail, $at + 1);
+    }
+    $h = $_SERVER["HTTP_HOST"] ?? "";
+    $h = preg_replace("/:\d+$/", "", $h);
+    return $h !== "" ? $h : "localhost";
+}
+
+function smtp_mime_header_encode(string $text): string {
+    if (function_exists("mb_encode_mimeheader")) {
+        return mb_encode_mimeheader($text, "UTF-8", true);
+    }
+    return "=?UTF-8?B?" . base64_encode($text) . "?=";
+}
+
+function smtp_dot_stuff(string $body): string {
+    $lines = explode("\n", $body);
+    $out = [];
+    foreach ($lines as $line) {
+        if ($line !== "" && $line[0] === ".") {
+            $out[] = "." . $line;
+        } else {
+            $out[] = $line;
+        }
+    }
+    return implode("\n", $out);
 }
 
 /**
@@ -201,13 +253,13 @@ function smtp_send_ssl(
 function smtp_expect($fp, array $codes): void {
     $line = fgets($fp, 8192);
     if ($line === false) {
-        throw new RuntimeException("SMTP read failed");
+        throw new RuntimeException("SMTP read failed (no data)");
     }
     $code = (int) substr($line, 0, 3);
     while (isset($line[3]) && $line[3] === "-") {
         $line = fgets($fp, 8192);
         if ($line === false) {
-            throw new RuntimeException("SMTP read failed");
+            throw new RuntimeException("SMTP read failed (multiline)");
         }
     }
     if (!in_array($code, $codes, true)) {
