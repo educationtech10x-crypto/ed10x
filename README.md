@@ -12,7 +12,7 @@ Production-ready landing website for **ED10X.com** — premium, minimal, high-co
 - Framer Motion animations
 - React Hook Form + Zod validation
 - Static export (`output: "export"`) + PHP contact handler (`public/contact.php`)
-- **`composer.json` / `composer.lock`** for Hostinger **Git deploy** (runs `composer install`, then optional Node rebuild — see below)
+- **`composer.json` / `composer.lock`** for Hostinger **Git deploy** (runs `composer install` only — see below)
 
 ## Getting started
 
@@ -51,12 +51,10 @@ npm run generate:logo
 ### Git deploy + Composer (Deploy button)
 
 1. **Before every push** that changes the site, run **`npm run build:deploy`**. That runs `next build` and copies **`out/` → `www/`**. Commit the updated **`www/`** files so the server always has a fresh static site (single hosting usually has **no Node.js**, so the live site comes from this folder).
-2. Push to GitHub. In hPanel, use your **Deploy** / **Git** workflow so it runs **`composer install`** (it will find `composer.json` and `composer.lock`).
+2. Push to GitHub. In hPanel, use your **Deploy** / **Git** workflow so it runs **`composer install`** (it will find `composer.json` and `composer.lock`). There is **no post-install shell step**: shared hosting PHP usually blocks `exec` / `passthru`, so the live site is always the **`www/`** folder you committed in step 1.
 3. Set the domain **document root** to the **`www`** folder inside the deployed project (e.g. `.../public_html/www` or `.../repositories/ed10x/www` — match whatever path Hostinger shows after clone).
 4. On the server, add **`contact-config.php`** (from `contact-config.example.php`) **inside `www/`** with your SMTP settings.
 5. Enable **HTTPS** in hPanel.
-
-If Hostinger’s deploy environment **does** include Node.js, `composer install` will also run **`npm ci`**, **`npm run build`**, and refresh **`www/`** automatically; otherwise the committed **`www/`** copy is what gets served.
 
 ### Manual upload (no Git)
 
