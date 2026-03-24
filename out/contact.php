@@ -16,7 +16,8 @@ $configPath = __DIR__ . "/contact-config.php";
 if (!is_readable($configPath)) {
     http_response_code(500);
     echo json_encode([
-        "error" => "Server email is not configured. Add contact-config.php next to contact.php.",
+        "error" =>
+            "Server email is not configured. On the host, copy contact-config.example.php to contact-config.php next to contact.php, then set SMTP password (see file comments).",
     ]);
     exit;
 }

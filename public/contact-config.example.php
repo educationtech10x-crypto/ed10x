@@ -1,14 +1,15 @@
 <?php
 /**
- * Copy this file to contact-config.php on the server (same folder as contact.php).
- * contact-config.php is gitignored — do not commit real passwords.
+ * On the server: copy this file to contact-config.php (same folder as contact.php, e.g. out/ or public_html).
+ * Set smtp_pass to the real password for support@ed10x.com (Hostinger → Email → your mailbox).
+ * Do not commit contact-config.php to Git.
  */
 return [
     "smtp_host" => "smtp.hostinger.com",
     "smtp_port" => 465,
-    "smtp_user" => "you@ed10x.com",
-    "smtp_pass" => "your-mailbox-password",
-    "contact_to" => "inbox@ed10x.com",
-    "contact_from_email" => "no-reply@ed10x.com",
+    "smtp_user" => "support@ed10x.com",
+    "smtp_pass" => "PASTE_YOUR_MAILBOX_PASSWORD_HERE",
+    "contact_to" => "support@ed10x.com",
+    "contact_from_email" => "support@ed10x.com",
     "contact_from_name" => "ED10X",
 ];
