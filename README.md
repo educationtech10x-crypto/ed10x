@@ -11,7 +11,8 @@ Production-ready landing website for **ED10X.com** — premium, minimal, high-co
 - shadcn-style UI components (Radix + CVA)
 - Framer Motion animations
 - React Hook Form + Zod validation
-- Next.js API route + Nodemailer (SMTP)
+- Static export (`output: "export"`) + PHP contact handler (`public/contact.php`)
+- **`composer.json` / `composer.lock`** for Hostinger **Git deploy** (runs `composer install`, then optional Node rebuild — see below)
 
 ## Getting started
 
@@ -25,16 +26,12 @@ Then open `http://localhost:3000`.
 
 ## Contact form email setup
 
-The contact form posts to `POST /api/contact` and **requires SMTP + email env vars**:
+The contact form posts to **`/contact.php`** (copied into `out/` on build). On the server:
 
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_USER`
-- `SMTP_PASS`
-- `CONTACT_FROM`
-- `CONTACT_TO`
+1. After deploying, copy `contact-config.example.php` to **`contact-config.php`** next to `index.html` (in **`www/`** on the server if you use Git deploy, or in `public_html` if you upload manually).
+2. Fill in SMTP and addresses (Hostinger mailbox SMTP is a good default). Do not commit `contact-config.php` — it is gitignored.
 
-If any are missing, the API returns a `500` with a clear error message.
+Local `npm run dev` does not run PHP; test the form on the server or with a local PHP server pointed at `out/`.
 
 ## Logo assets
 
@@ -49,46 +46,27 @@ Regenerate PNGs from SVG:
 npm run generate:logo
 ```
 
-## Deployment (Vercel)
+## Deployment (Hostinger single / static hosting)
 
-1. Push the project to GitHub/GitLab/Bitbucket.
-2. Import it on Vercel.
-3. Add the env vars from `.env.example` in Vercel Project Settings → Environment Variables.
-4. Deploy.
+### Git deploy + Composer (Deploy button)
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+1. **Before every push** that changes the site, run **`npm run build:deploy`**. That runs `next build` and copies **`out/` → `www/`**. Commit the updated **`www/`** files so the server always has a fresh static site (single hosting usually has **no Node.js**, so the live site comes from this folder).
+2. Push to GitHub. In hPanel, use your **Deploy** / **Git** workflow so it runs **`composer install`** (it will find `composer.json` and `composer.lock`).
+3. Set the domain **document root** to the **`www`** folder inside the deployed project (e.g. `.../public_html/www` or `.../repositories/ed10x/www` — match whatever path Hostinger shows after clone).
+4. On the server, add **`contact-config.php`** (from `contact-config.example.php`) **inside `www/`** with your SMTP settings.
+5. Enable **HTTPS** in hPanel.
 
-## Getting Started
+If Hostinger’s deploy environment **does** include Node.js, `composer install` will also run **`npm ci`**, **`npm run build`**, and refresh **`www/`** automatically; otherwise the committed **`www/`** copy is what gets served.
 
-First, run the development server:
+### Manual upload (no Git)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Run **`npm run build`** (or **`npm run build:deploy`**).
+2. Upload everything inside **`out/`** (or **`www/`**) to **`public_html`**.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Optional: **Vercel** and similar hosts can run a Node deployment if you drop static export and restore a server-side contact API.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+See [Next.js static export](https://nextjs.org/docs/app/building-your-application/deploying/static-exports) for details.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Composer lock hash
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+If you change **`require`** or **`name`** in `composer.json`, run **`composer update --no-install`** (or full `composer update`) locally to refresh **`composer.lock`**, or Hostinger may report a lock mismatch.

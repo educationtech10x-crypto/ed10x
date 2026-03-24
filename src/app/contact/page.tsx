@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { Container } from "@/components/site/container";
 import { SectionHeading } from "@/components/site/section-heading";
@@ -16,13 +17,15 @@ export const metadata: Metadata = {
 const cover =
   "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=2400&q=80";
 
-export default function ContactPage({
-  searchParams,
-}: {
-  searchParams: Record<string, string | string[] | undefined>;
-}) {
-  const service = typeof searchParams.service === "string" ? searchParams.service : null;
+function ContactFormFallback() {
+  return (
+    <div className="grid gap-5">
+      <p className="text-sm text-white/50">Loading form…</p>
+    </div>
+  );
+}
 
+export default function ContactPage() {
   return (
     <div className="bg-[#0B0B0F]">
       <section className="relative overflow-hidden border-b border-white/5">
@@ -37,8 +40,8 @@ export default function ContactPage({
             description="Tell us your goal and budget. We’ll respond quickly with a clean plan and quote."
           />
           <div className="mt-8 text-sm text-white/60">
-            Prefer WhatsApp? Set <code className="rounded bg-white/10 px-2 py-1">NEXT_PUBLIC_WHATSAPP_NUMBER</code>{" "}
-            and the chat button will appear.
+            Prefer WhatsApp? Use the chat button — configure the number at build time via{" "}
+            <code className="rounded bg-white/10 px-2 py-1">NEXT_PUBLIC_WHATSAPP_NUMBER</code>.
           </div>
         </Container>
       </section>
@@ -52,7 +55,9 @@ export default function ContactPage({
                 We’ll confirm the fastest channel mix for your goal (campus, local, digital, or hybrid).
               </p>
               <div className="mt-8">
-                <ContactForm defaultService={service} />
+                <Suspense fallback={<ContactFormFallback />}>
+                  <ContactForm />
+                </Suspense>
               </div>
             </Card>
           </section>

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -13,11 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-export function ContactForm({
-  defaultService,
-}: {
-  defaultService?: string | null;
-}) {
+export function ContactForm() {
+  const searchParams = useSearchParams();
   const [submitting, setSubmitting] = React.useState(false);
 
   const form = useForm<ContactPayload>({
@@ -27,20 +25,32 @@ export function ContactForm({
       company: "",
       phone: "",
       email: "",
-      adType:
-        (adTypes.includes(defaultService as (typeof adTypes)[number])
-          ? (defaultService as (typeof adTypes)[number])
-          : undefined) ?? "Digital Ads",
+      adType: "Digital Ads",
       budgetRange: "₹10k–₹25k",
       message: "",
     },
     mode: "onTouched",
   });
 
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    watch,
+  } = form;
+
+  React.useEffect(() => {
+    const service = searchParams.get("service");
+    if (service && adTypes.includes(service as (typeof adTypes)[number])) {
+      setValue("adType", service as ContactPayload["adType"], { shouldValidate: true });
+    }
+  }, [searchParams, setValue]);
+
   async function onSubmit(values: ContactPayload) {
     try {
       setSubmitting(true);
-      const res = await fetch("/api/contact", {
+      const res = await fetch("/contact.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
@@ -66,14 +76,6 @@ export function ContactForm({
       setSubmitting(false);
     }
   }
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setValue,
-    watch,
-  } = form;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="grid gap-5">

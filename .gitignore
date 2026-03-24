@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/vendor/
 /.pnp
 .pnp.*
 .yarn/*
@@ -29,6 +30,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+
+# PHP mail secrets (static deploy — created on server only)
+/public/contact-config.php
 
 # env files (keep .env.example for docs)
 .env

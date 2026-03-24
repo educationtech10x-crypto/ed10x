@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:deploy": "next build && node scripts/sync-www.mjs",
     "start": "next start",
     "lint": "eslint",
     "generate:logo": "node scripts/generate-logo-png.mjs"
@@ -18,7 +19,6 @@
     "framer-motion": "^12.38.0",
     "lucide-react": "^0.577.0",
     "next": "16.1.7",
-    "nodemailer": "^8.0.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.2",
@@ -29,7 +29,6 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
-    "@types/nodemailer": "^7.0.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
